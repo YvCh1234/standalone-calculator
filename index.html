@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工程計算機</title>
+  <style>
+    :root { color-scheme: dark; } * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:20px; background:radial-gradient(circle at 15% 0%,#304a7a,transparent 35%),#10131d; font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif; color:#f5f7ff; }
+    .calculator { width:min(96vw,520px); padding:19px; border-radius:27px; background:linear-gradient(145deg,#2a344a,#171c29); border:1px solid rgba(255,255,255,.1); box-shadow:18px 20px 48px #070911,-8px -8px 24px #3b4966; }
+    .topline { display:flex; justify-content:space-between; align-items:center; margin:0 5px 13px; color:#b8c5df; font-size:12px; letter-spacing:.1em; }
+    .mode { border:1px solid #60739c; color:#b9ccff; background:transparent; border-radius:9px; padding:5px 9px; height:auto; font-size:11px; box-shadow:none; }
+    .screen { min-height:103px; padding:14px 17px; margin-bottom:13px; border-radius:17px; display:flex; flex-direction:column; justify-content:end; align-items:flex-end; background:#090d16; box-shadow:inset 2px 2px 8px #03050a,inset -1px -1px 4px #26344e; overflow:hidden; }
+    #history { height:21px; color:#8290ab; font-size:13px; white-space:nowrap; } #display { width:100%; text-align:right; font-size:clamp(29px,8vw,43px); line-height:1.25; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .keys { display:grid; grid-template-columns:repeat(5,1fr); gap:9px; }
+    button { min-width:0; height:48px; border:0; border-radius:13px; cursor:pointer; font:inherit; font-size:17px; font-weight:600; color:#eef3ff; background:#303a50; box-shadow:3px 3px 8px #0c101a,-1px -1px 5px #485673; transition:transform .1s,filter .1s; }
+    button:hover { filter:brightness(1.16); } button:active { transform:scale(.94); box-shadow:inset 2px 2px 6px #131928; } .scientific { font-size:14px; color:#c8d6ff; background:#27334d; } .function { color:#b9c8ff; background:#27304a; } .ans-add { grid-column:span 2; } .operator { color:#ffd6a0; background:#3d3747; } .equals { background:#e98c47; color:#251309; box-shadow:3px 3px 8px #0c101a,-1px -1px 5px #7a5138; } .hint { margin:12px 2px 0; text-align:center; color:#8996ae; font-size:11px; }
+    @media (max-width:390px) { body{padding:9px}.calculator{padding:14px;border-radius:21px}.keys{gap:7px}button{height:45px;font-size:15px}.scientific{font-size:12px}.screen{min-height:91px} }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="工程計算機">
+    <div class="topline"><span>SCIENTIFIC · OFFLINE</span><button class="mode" id="mode" title="切換角度與弧度">DEG</button></div>
+    <section class="screen" aria-live="polite"><div id="history"></div><div id="display">0</div></section>
+    <div class="keys">
+      <button class="scientific" data-unary="sin">sin</button><button class="scientific" data-unary="cos">cos</button><button class="scientific" data-unary="tan">tan</button><button class="scientific" data-unary="log">log</button><button class="scientific" data-unary="ln">ln</button>
+      <button class="scientific" data-unary="asin">sin⁻¹</button><button class="scientific" data-unary="acos">cos⁻¹</button><button class="scientific" data-unary="atan">tan⁻¹</button><button class="scientific" data-unary="square">x²</button><button class="scientific" data-unary="sqrt">√x</button>
+      <button class="scientific" data-value="π">π</button><button class="scientific" data-value="e">e</button><button class="scientific" data-unary="factorial">n!</button><button class="scientific" data-action="reciprocal">1/x</button><button class="operator" data-value="^">xʸ</button>
+      <button class="function" data-action="clear">AC</button><button class="function" data-action="backspace">⌫</button><button class="function" data-action="sign">±</button><button class="function" data-action="percent">%</button><button class="function" data-action="permille">‰</button>
+      <button data-value="7">7</button><button data-value="8">8</button><button data-value="9">9</button><button class="operator" data-value="÷">÷</button><button class="operator" data-value="×">×</button>
+      <button data-value="4">4</button><button data-value="5">5</button><button data-value="6">6</button><button class="operator" data-value="−">−</button><button class="operator" data-value="+">+</button>
+      <button data-value="1">1</button><button data-value="2">2</button><button data-value="3">3</button><button class="equals" data-action="equals">＝</button><button data-value="0">0</button>
+      <button data-value=".">.</button><button class="function" data-action="exp">EXP</button><button class="function" data-action="ans">Ans</button><button class="function ans-add" data-action="addAns">+Ans</button>
+    </div>
+    <p class="hint">角度模式可切換 DEG／RAD · 支援鍵盤輸入、Esc 清除、Enter 計算</p>
+  </main>
+  <script>
+    const display=document.querySelector('#display'),history=document.querySelector('#history'),modeButton=document.querySelector('#mode');
+    let current='0',previous=null,operator=null,reset=false,angleMode='DEG',answer=0;
+    const symbol={'/':'÷','*':'×','-':'−'};
+    const format=n=>Number.isFinite(n)?Number(n.toPrecision(12)).toLocaleString('en-US',{maximumFractionDigits:10}):'錯誤';
+    function formatDisplay(value){if(value==='錯誤'||value.toLowerCase().includes('e'))return value;const [integer,decimal]=value.split('.');const grouped=Number(integer||0).toLocaleString('en-US');return decimal===undefined?grouped:`${grouped}.${decimal}`}
+    function render(){display.textContent=formatDisplay(current)} function number(){return Number(current)} const toRad=x=>angleMode==='DEG'?x*Math.PI/180:x; const fromRad=x=>angleMode==='DEG'?x*180/Math.PI:x;
+    function setResult(value,label){current=format(value).replaceAll(',','');answer=Number(current);history.textContent=`${label} =`;reset=true;render()}
+    function input(value){if(value==='π'||value==='e'){current=String(value==='π'?Math.PI:Math.E);reset=true;render();return}if(reset){current=value==='.'?'0.':value;reset=false}else if(value==='.'&&!current.includes('.'))current+='.';else if(value!=='.'&&current==='0')current=value;else if(value!=='.')current+=value;render()}
+    function calculate(){if(previous===null||operator===null)return;const a=Number(previous),b=number();const result=operator==='+'?a+b:operator==='−'?a-b:operator==='×'?a*b:operator==='÷'?(b===0?NaN:a/b):Math.pow(a,b);history.textContent=`${format(a)} ${operator} ${format(b)} =`;current=format(result).replaceAll(',','');answer=Number(current);previous=null;operator=null;reset=true;render()}
+    function choose(op){if(operator&&!reset)calculate();previous=current;operator=op;reset=true;history.textContent=`${format(Number(previous))} ${op}`}
+    function unary(kind){const x=number();const funcs={sin:()=>Math.sin(toRad(x)),cos:()=>Math.cos(toRad(x)),tan:()=>Math.tan(toRad(x)),asin:()=>fromRad(Math.asin(x)),acos:()=>fromRad(Math.acos(x)),atan:()=>fromRad(Math.atan(x)),log:()=>Math.log10(x),ln:()=>Math.log(x),square:()=>x*x,sqrt:()=>Math.sqrt(x),factorial:()=>Number.isInteger(x)&&x>=0&&x<=170?Array.from({length:x},(_,i)=>i+1).reduce((a,b)=>a*b,1):NaN};const labels={square:`(${format(x)})²`,sqrt:`√${format(x)}`,factorial:`${format(x)}!`};setResult(funcs[kind](),labels[kind]||`${kind}(${format(x)})`)}
+    function action(name){if(name==='clear'){current='0';previous=operator=null;history.textContent='';reset=false}if(name==='backspace'&&!reset)current=current.length>1?current.slice(0,-1):'0';if(name==='sign')current=String(number()*-1);if(name==='percent')current=String(number()/100);if(name==='permille')setResult(number()/1000,`${format(number())}‰`);if(name==='reciprocal')setResult(1/number(),`1/${format(number())}`);if(name==='exp'&&!current.toLowerCase().includes('e')){current+='e';reset=false}if(name==='ans'){current=String(answer);if(operator!==null)history.textContent=`${format(Number(previous))} ${operator} Ans (${format(answer)})`;else history.textContent=`Ans = ${format(answer)}`;reset=true}if(name==='addAns'){const before=number();setResult(before+answer,`${format(before)} + Ans (${format(answer)})`)}if(name==='equals')calculate();render()}
+    document.querySelectorAll('[data-value],[data-action],[data-unary]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.unary)unary(btn.dataset.unary);else if(btn.dataset.action)action(btn.dataset.action);else if(['+','−','×','÷','^'].includes(btn.dataset.value))choose(btn.dataset.value);else input(btn.dataset.value)}));
+    modeButton.addEventListener('click',()=>{angleMode=angleMode==='DEG'?'RAD':'DEG';modeButton.textContent=angleMode;history.textContent=`角度模式：${angleMode}`});
+    document.addEventListener('keydown',e=>{const value=symbol[e.key]||e.key;if(/^[0-9.]$/.test(e.key))input(e.key);else if(['+','−','×','÷','^'].includes(value))choose(value);else if(e.key==='Enter'||e.key==='=')action('equals');else if(e.key==='Escape'||e.key==='Delete')action('clear');else if(e.key==='Backspace')action('backspace')});
+  </script>
+</body>
+</html>
